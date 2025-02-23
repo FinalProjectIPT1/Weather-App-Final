@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <!-- Weather Info -->
+            <div class="card">
+                <div class="search">
+                    <input type="text" placeholder="Enter city name" spellcheck="false">
+                    <button><img src="images/search.png" alt="Search"></button>
+                </div>
+                <div class="error">
+                    <p>Invalid city name</p>
+                </div>
+                <div class="weather">
+                    <img src="images/rain.png" class="weather-icon" alt="Weather Icon">
+                    <h1 class="temp">22°C</h1>
+                    <h2 class="city">New York</h2>
+                    <p class="time">Loading local time...</p>
+                    <div class="details">
+                        <div class="col">
+                            <img src="images/humidity.png" alt="Humidity Icon">
+                            <div>
+                                <p class="humidity">50%</p>
+                                <p>Humidity</p>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <img src="images/wind.png" alt="Wind Speed Icon">
+                            <div>
+                                <p class="wind">15 km/h</p>
+                                <p>Wind Speed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="right-panel">
+            <!-- Map -->
+            <div id="map" style="height: 300px; border-radius: 20px; margin-top: 20px;"></div>
+        </div>
+    </div>
+    
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // The API key for OpenWeatherMap is defined here, which will be used for making weather data requests.
+    const apiKey = "820de870fffcc464ebd02f3323ed4642";
+    
+    // This variable contains the base URL for the OpenWeatherMap API, which is appended with city and API key for each request.
+    const apiUrl = "https://api.openweathermap.org/data/2.5/weather?units=metric&q=";
+
+    // These are the DOM elements related to the search functionality, and weather information display.
+    const searchBox = document.querySelector(".search input");
+    const searchBtn = document.querySelector(".search button");
+    const weatherIcon = document.querySelector(".weather-icon");
+    
+    // The intervalId is used to store the interval for dynamically updating the local time.
+    let intervalId;
+
+    // The checkWeather function is responsible for making an API call to fetch weather data based on the city entered.
+    async function checkWeather(city) {
+        // A fetch request is made to the OpenWeatherMap API, where the city and API key are included as parameters.
+        const response = await fetch(apiUrl + city + `&appid=${apiKey}`);
+        
+        // If the city is not found (404 error), an error message is displayed, and the weather section is hidden.
+        if (response.status == 404) {
+            document.querySelector(".error").style.display = "block"; // Error message is shown
+            document.querySelector(".weather").style.display = "none"; // Weather data is hidden
+        } else {
+            // If the request is successful, the data is parsed and the weather information is updated on the UI.
+            const data = await response.json();
+            document.querySelector(".city").innerHTML = data.name; // City name is displayed
+            document.querySelector(".temp").innerHTML = Math.round(data.main.temp) + "°C"; // Temperature is displayed
+            document.querySelector(".humidity").innerHTML = data.main.humidity + "%"; // Humidity is displayed
+            document.querySelector(".wind").innerHTML = data.wind.speed + " km/h"; // Wind speed is displayed
+
+            // Depending on the weather condition returned from the API, the appropriate weather icon is selected.
+            const weatherCondition = data.weather[0].main.toLowerCase();
+            const weatherIcons = {
+                clear: "images/clear.png",
+                clouds: "images/clouds.png",
+                drizzle: "images/drizzle.png",
+                mist: "images/mist.png",
+                rain: "images/rain.png",
+                snow: "images/snow.png"
+            };
+            weatherIcon.src = weatherIcons[weatherCondition] || "images/rain.png"; // Default to rain icon if condition is unrecognized
+
+            // The local time is updated dynamically based on the timezone offset from the weather data.
+            const timezoneOffset = data.timezone; // Timezone offset is retrieved from the API response
+            clearInterval(intervalId); // Any existing interval is cleared before setting a new one
+            intervalId = setInterval(() => {
+                const localTime = new Date(new Date().getTime() + timezoneOffset * 1000); // Local time is calculated
+                document.querySelector(".time").innerHTML = localTime.toUTCString().replace("GMT", "Local Time"); // Time is updated on the UI
+            }, 1000);
+
+            // The map is initialized or updated based on the latitude and longitude of the city obtained from the API.
+            const { lat, lon } = data.coord;
+            initializeMap(lat, lon);
+
+            // Weather data section is displayed while the error message is hidden.
+            document.querySelector(".weather").style.display = "block"; // Show weather data
+            document.querySelector(".error").style.display = "none"; // Hide error message
+        }
+    }
+
+    // The initializeMap function is responsible for setting up the map view using Leaflet, based on the provided latitude and longitude.
+    let map;
+    function initializeMap(lat, lon) {
+        if (!map) {
+            // If the map does not exist, create a new map centered on the provided coordinates.
+            map = L.map('map').setView([lat, lon], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map); // Add OpenStreetMap tile layer to the map
+        } else {
+            // If the map already exists, update the map view to center on the new coordinates.
+            map.setView([lat, lon], 13);
+        }
+        L.marker([lat, lon]).addTo(map).bindPopup('Weather Location').openPopup(); // Add a marker on the map to indicate the weather location
+    }
+
+    // Event listener to trigger the checkWeather function when the search button is clicked.
+    searchBtn.addEventListener("click", () => {
+        checkWeather(searchBox.value); // Call checkWeather function with the city name entered in the search box
+    });
+</script>
+</body>
+</html>
